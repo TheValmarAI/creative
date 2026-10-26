@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Creative · Workflow</title>
+<style>
+*{box-sizing:border-box}body{height:100dvh;display:flex;flex-direction:column;margin:0;color:#20312c;background:#f7f8f4;font:15px system-ui,sans-serif}
+header{padding:22px 28px;background:#fff;border-bottom:1px solid #dbe1db}
+h1{font-size:23px;margin:0 0 7px}header p{margin:0;color:#5a6d63;font-size:13px}
+main{display:grid;grid-template-columns:290px minmax(0,1fr);flex:1;min-height:0}
+#map{overflow:auto;padding:24px 20px;position:relative}#canvas{display:flex;flex-direction:column;gap:28px}
+.node{position:relative;width:100%;min-height:64px;flex-shrink:0;text-align:left;
+background:#fff;border:1px solid #cbd5cd;border-radius:12px;padding:14px;cursor:pointer;color:inherit;font:inherit;
+box-shadow:0 3px 9px #23342a08}.node:hover{border-color:#18765b}.node[aria-pressed=true]{border:2px solid #18765b;background:#edf7ef}
+.node:not(:last-child)::after{content:"↓";position:absolute;left:24px;bottom:-26px;height:24px;color:#91a69a;font-size:20px;pointer-events:none}
+.node:focus-visible{outline:3px solid #e3ac4e;outline-offset:3px}
+.node strong{display:block;font-size:14px;overflow-wrap:anywhere}
+aside{min-width:0;background:#fff;border-left:1px solid #dbe1db;padding:28px clamp(24px,4vw,64px);overflow:auto}h2{font-size:21px;margin:0 0 10px;overflow-wrap:anywhere}
+h3{font-size:14px;margin:24px 0 10px}p{line-height:1.55}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 system-ui,sans-serif;margin:0}
+.selected{border-left:3px solid #18765b;background:#edf7ef;border-radius:5px;padding:14px}
+.candidate{border:1px solid #dbe1db;border-radius:8px;padding:13px;margin:10px 0}.candidate.chosen{border:2px solid #18765b;background:#edf7ef}
+summary{cursor:pointer;font-size:13px;padding:10px 0}
+details pre{color:#53675c}.framework-card{padding:0;overflow:hidden}
+.framework-card summary{padding:18px;list-style:none;position:relative;padding-right:45px}
+.framework-card summary::-webkit-details-marker{display:none}
+.framework-card summary::after{content:"+";position:absolute;right:18px;top:18px;font-size:20px;color:#18765b}
+.framework-card[open] summary::after{content:"−"}.framework-card summary:focus-visible{outline:3px solid #e3ac4e;outline-offset:-3px}
+.framework-card summary strong{display:block;font-size:16px;line-height:1.4}
+.framework-card pre{border-top:1px solid #dbe1db;padding:18px;font:13px/1.65 ui-monospace,monospace}
+button.prompt-toggle{border:1px solid #cbd5cd;border-radius:7px;background:#fff;padding:9px 13px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+button.prompt-toggle:focus-visible{outline:3px solid #e3ac4e;outline-offset:3px}
+.prompt-content{margin:14px 0 22px}.prompt-model{font-size:13px;color:#60746a;margin:0 0 8px}
+.prompt-box{display:block;width:100%;height:55vh;min-height:300px;resize:vertical;border:1px solid #d4ddd4;border-radius:9px;background:#f5f7f2;color:#263b31;padding:18px;font:13px/1.7 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+button.endpoint{border-color:#a79c79;background:#fffbed}
+@media(max-width:700px){main{grid-template-columns:1fr;grid-template-rows:35% minmax(0,1fr)}#map{padding:16px}aside{border-left:0;border-top:1px solid #dbe1db;padding:20px}}
+</style>
+</head>
+<body>
+<header><h1>Creative · Workflow</h1><p id="subtitle"></p></header>
+<main><section id="map" aria-label="Ordered workflow chain"><div id="canvas"></div></section>
+<aside aria-label="Node details" id="details" aria-live="polite"></aside></main>
+<script type="application/json" id="workflow-data">__WORKFLOW_DATA__</script>
+<script>
+"use strict";
+const data=JSON.parse(document.getElementById("workflow-data").textContent);
+const canvas=document.getElementById("canvas"), panel=document.getElementById("details");
+document.getElementById("subtitle").textContent=`${data.nodes.filter(node=>node.selection&&node.id!=="0").length} workflow decisions · ${data.candidate_count} alternatives per decision · ${data.elapsed_seconds.toFixed(1)}s · Ordered chain · Click a node to explore`;
+const buttons=new Map();
+const text=value=>typeof value==="string"?value:JSON.stringify(value,null,2);
+function element(tag,value,parent,cls){const el=document.createElement(tag);if(value!==undefined)el.textContent=value;if(cls)el.className=cls;parent.append(el);return el;}
+function section(title,value,cls){element("h3",title,panel);element("pre",text(value),panel,cls);}
+function contentCard(value){const card=element("div",undefined,panel,"candidate");element("pre",value,card);}
+for(const node of data.nodes){
+ const button=element("button",undefined,canvas,"node"+(node.id==="__input__"||node.output!==undefined?" endpoint":""));button.type="button";
+ button.setAttribute("aria-pressed","false");
+ element("strong",node.label,button);
+ button.addEventListener("click",()=>select(node));buttons.set(node.id,button);
+}
+function frameworkCard(value,chosen){
+ const card=element("details",undefined,panel,"candidate framework-card"+(chosen?" chosen":""));
+ const summary=element("summary",undefined,card);
+ element("strong",value.name,summary);
+ element("pre",text(value),card);
+}
+function modelInput(input){
+ const button=element("button","Full LLM input",panel,"prompt-toggle");button.type="button";
+ button.setAttribute("aria-expanded","false");button.setAttribute("aria-controls","prompt-content");
+ const box=element("div",undefined,panel,"prompt-content");box.id="prompt-content";box.hidden=true;
+ element("p",input?.model||"Not recorded",box,"prompt-model");
+ const prompt=element("textarea",undefined,box,"prompt-box");prompt.readOnly=true;
+ prompt.setAttribute("aria-label","Full LLM prompt");
+ prompt.value=input?.prompt||"This older run did not record its model input.";
+ button.addEventListener("click",()=>{box.hidden=!box.hidden;button.setAttribute("aria-expanded",String(!box.hidden));});
+}
+function select(node){
+ for(const [id,button]of buttons)button.setAttribute("aria-pressed",String(id===node.id));
+ panel.replaceChildren();element("h2",node.label,panel);element("p",node.purpose,panel);
+ panel.scrollTop=0;
+ if(node.id==="__input__"){contentCard(node.input??"The original input was not recorded in this older result.");return;}
+ modelInput(node.model_input);
+ if(node.output!==undefined){contentCard(node.output);return;}
+ const selection=node.selection;
+ if(node.id==="0"){
+  section("Selected framework",selection.selected_value.name,"selected");
+  element("p",selection.selected_value.organizing_principle,panel);
+ }else section("Selected value",selection.selected_value,"selected");
+ element("h3","All alternatives",panel);
+ for(const [index,value]of (selection.candidates||[]).entries()){
+  if(node.id==="0"){frameworkCard(value,index===selection.selected_index);continue;}
+  const item=element("div",undefined,panel,"candidate"+(index===selection.selected_index?" chosen":""));
+  element("pre",text(value),item);
+ }
+ panel.scrollTop=0;
+}
+select(data.nodes[0]);
+</script>
+</body>
+</html>

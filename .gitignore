@@ -1,0 +1,27 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.logfire/
+
+# Python environments and generated files
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local generation artifacts
+live-result.json
+result.json
+creative-view-*/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
