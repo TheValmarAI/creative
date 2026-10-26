@@ -18,7 +18,7 @@ def test_logfire_setup_reads_dotenv_key_and_instruments_agents(tmp_path, monkeyp
     monkeypatch.delenv("LOGFIRE_TOKEN", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text("LOGFIRE_TOKEN=test-logfire-write-token\n", encoding="utf-8")
-    settings = Settings(_env_file=env_file)
+    settings = Settings(_env_file=env_file, logfire_enabled=True)
     configure = Mock()
     instrument = Mock()
     monkeypatch.setattr(observability, "_configured", False)
