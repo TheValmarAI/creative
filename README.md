@@ -3,19 +3,55 @@
 **Let models propose. Let randomness decide.**
 
 Creative turns a brief into a framework-led workflow, generates alternatives for each decision,
-and uses Python's random generator to select a path. Later steps develop the consequences of
+and uses code-backed randomness to select a path. Later steps develop the consequences of
 those choices into a finished ad, story, strategy, or product concept.
 
-One async Python core. Three interfaces: **CLI, REST API, and MCP**. Powered by
-[Pydantic AI](https://ai.pydantic.dev/), with swappable models and Pydantic AI Gateway support.
+Choose between two approaches to the same process:
+
+| Approach | Where it runs | What you need |
+| --- | --- | --- |
+| [Skill in your harness](#skill-in-your-harness) | One LLM context in your existing agent harness | The skill prompt and a code execution tool |
+| [External Creative Service](#external-creative-service) | This Python application, via CLI, REST, or MCP | Python, uv, and configured provider credentials |
 
 [![Checks](https://github.com/TheValmarAI/creative/actions/workflows/checks.yml/badge.svg)](https://github.com/TheValmarAI/creative/actions/workflows/checks.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+## Skill in your harness
+
+Load [`skills/creative-workflow/SKILL.md`](skills/creative-workflow/SKILL.md) into your harness
+as a skill, or use its contents as the instructions for a creative request. The folder contains
+just one prompt; no service installation, Gateway configuration, or project code is required.
+
+For a harness that discovers skill folders, copy `skills/creative-workflow` into its configured
+skills directory. Then invoke it using your harness's normal skill mechanism, for example:
+
+```text
+Use the creative-workflow skill. Generate a TikTok ad for a bottle of water called
+Malaga Mellow. Use k=5 alternatives at each decision.
+```
+
+One LLM creates the framework pool, plans the workflow, generates alternatives step by step,
+and writes the final work in a single context. After each pool it executes a code selector
+using `secrets.randbelow(k)` and develops the returned selection. The prompt includes a minimal
+Python selector, instructions for substantive variety, and a reviewable record of choices.
+The default is k=20; the user can override it.
+
+The harness must support code execution. A model claiming to pick randomly is not a substitute.
+A shared context also cannot truly hide earlier text or unselected alternatives from the model;
+cue-only inspiration is a working discipline here. Keep the workflow and pool lengths within
+the model's context window. Use the external service when you want separately scoped model
+calls, typed validation, reusable interfaces, and the visualizer.
+
+## External Creative Service
+
+The application has one async Python core and three interfaces: **CLI, REST API, and MCP**.
+It uses [Pydantic AI](https://ai.pydantic.dev/) with swappable models and Pydantic AI Gateway
+support. Each role runs as a separately scoped call; Python handles selection and execution.
+
 ![The Creative visualizer: a vertical workflow and expandable framework cards](docs/images/frameworks.jpg)
 
-## Quick start
+### Quick start
 
 Install [uv](https://docs.astral.sh/uv/), then:
 
@@ -43,7 +79,7 @@ uv run creative \
 Generation uses your configured provider account. The default model is
 `gateway/openai-responses:gpt-6-luna`; change `AI_MODEL` to use another supported model.
 
-## How it works
+### How it works
 
 ```text
 Your brief
@@ -78,7 +114,7 @@ workflow, selections, and optional candidate pools make the process inspectable.
 
 See the [worked story example](docs/workflow-example.md) for a complete walkthrough.
 
-## CLI
+### CLI
 
 ```sh
 # Just the finished output.
@@ -101,7 +137,7 @@ uv run creative "Design an unusual onboarding experience." --visualize --json > 
 Progress stays on stderr, so stdout can be redirected to a file. Ctrl+C cancels in-flight work.
 Run `uv run creative --help` for the CLI reference.
 
-## Visualizer
+### Visualizer
 
 The visualizer opens as a self-contained local HTML file. No server or JavaScript build is
 needed. Its path is printed to stderr so you can reopen it later.
@@ -117,7 +153,7 @@ Prompt capture is enabled for `--visualize`. The resulting file contains your in
 content, and model inputs; treat it like the original brief. It is saved privately in the
 system temporary directory. Ordinary server logs do not include those contents.
 
-## REST API and MCP
+### REST API and MCP
 
 ```sh
 uv run creative-api
@@ -156,7 +192,7 @@ client and proxy timeouts accordingly.
 See [configuration and operations](docs/configuration.md) for model switching, authentication,
 observability, Docker, limits, and response contracts.
 
-## Development
+### Development
 
 ```sh
 uv sync --locked
